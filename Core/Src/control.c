@@ -60,6 +60,34 @@
 /* Количество отсчётов для медианного фильтра силы. */
 #define CONTROL_FILTER_N           5U
 
+/*
+ * Защита от удара.
+ *
+ * Идея: если сила выросла на SHOCK_DELTA_G за время меньше
+ * SHOCK_WINDOW_MS (250 мс) и достигла SHOCK_MIN_G, это не плавное
+ * нажатие, а удар. Порог — больше 2 кг (2000 г), то есть за
+ * пределами штатного диапазона 100–600 г.
+ *
+ * В ответ отводим каретку в far=0 на максимальной скорости.
+ *
+ * Тормозить начинаем заранее: max_travel - SHOCK_BRAKE_COUNTS,
+ * то есть за 35000 counts до far=0. На 90 RPM с Motor_Stop(acc=200)
+ * реальный тормозной путь ~25000–30000 counts, поэтому остаётся
+ * резерв до механического края 0.
+ *
+ * Во время отвода работаем чаще (20 мс), чтобы не проскочить
+ * точку начала торможения на высокой скорости.
+ * После остановки в 0 ждём CONTROL_SHOCK_HOLD_MS (1 с) и
+ * возвращаемся к обычной логике демо — это тестовый режим.
+ */
+#define CONTROL_SHOCK_PERIOD_MS        20U
+#define CONTROL_SHOCK_WINDOW_MS        250U
+#define CONTROL_SHOCK_DELTA_G          2000.0f
+#define CONTROL_SHOCK_MIN_G            2000.0f
+#define CONTROL_SHOCK_BRAKE_COUNTS     35000L
+#define CONTROL_SHOCK_STOP_TOLERANCE   1000L
+#define CONTROL_SHOCK_HOLD_MS          1000U
+
 /* Модуль 32-битного числа без использования библиотеки math. */
 static int32_t control_abs32(int32_t value)
 {
@@ -168,6 +196,12 @@ void Control_Init(Control *control, Sensor *sensor, Motor *motor)
   control->limits_valid = 0U;
   control->read_failures = 0U;
   control->jog_failures = 0U;
+  control->shock_active = 0U;
+  control->shock_holding = 0U;
+  control->shock_target_travel = 0;
+  control->shock_min_force = 1000000.0f;
+  control->shock_window_tick = 0U;
+  control->shock_hold_tick = 0U;
   control->home_pos = 0;
   control->far_pos = 0;
   control->max_travel = 0;
@@ -301,7 +335,7 @@ void Control_SetMaxRpm(Control *control, int16_t rpm)
   control->max_rpm = rpm;
 }
 
-/* Задаёт скорость возврата к home, 1..20 RPM. */
+/* Задаёт скорость возврата к home, 1..50 RPM. */
 void Control_SetReturnRpm(Control *control, int16_t rpm)
 {
   if (control == NULL)
@@ -313,10 +347,11 @@ void Control_SetReturnRpm(Control *control, int16_t rpm)
   {
     rpm = 1;
   }
-  /* Возврат специально медленнее движения, чтобы не бить в home. */
-  if (rpm > 20)
+  /* Возврат 1..50 RPM. На 40-50 каретка идёт плавнее, чем на 20:
+   * на малой скорости механика даёт рывки/залипания. */
+  if (rpm > 50)
   {
-    rpm = 20;
+    rpm = 50;
   }
 
   control->return_rpm = rpm;
@@ -413,6 +448,12 @@ uint8_t Control_Start(Control *control)
   control->active = 1U;
   control->read_failures = 0U;
   control->jog_failures = 0U;
+  control->shock_active = 0U;
+  control->shock_holding = 0U;
+  control->shock_target_travel = 0;
+  control->shock_min_force = 1000000.0f;
+  control->shock_window_tick = HAL_GetTick();
+  control->shock_hold_tick = 0U;
   control->last_cmd_rpm = 0;
   control->last_tick = HAL_GetTick();
   control->last_position = 0;
@@ -432,6 +473,8 @@ void Control_Stop(Control *control)
   /* Снимаем флаг демо и сбрасываем последнюю команду. */
   control->active = 0U;
   control->last_cmd_rpm = 0;
+  control->shock_active = 0U;
+  control->shock_holding = 0U;
 
   if (control->motor != NULL)
   {
@@ -458,7 +501,8 @@ void Control_Loop(Control *control)
 
   /* Работаем не чаще раза в 50 мс. HAL_GetTick() переполняется
    * корректно благодаря беззнаковой разности. */
-  if ((HAL_GetTick() - control->last_tick) < CONTROL_PERIOD_MS)
+  if ((HAL_GetTick() - control->last_tick) <
+      (control->shock_active ? CONTROL_SHOCK_PERIOD_MS : CONTROL_PERIOD_MS))
   {
     return;
   }
@@ -484,23 +528,8 @@ void Control_Loop(Control *control)
   control->last_force_g = force;
   control->last_position = position;
 
-  /* Перегрузка в любую сторону. Демо не выключаем: когда сила
-   * вернётся в норму, логика продолжит работать. */
-  if (force > control->max_force_g || force < -control->max_force_g)
-  {
-    /* Перегрузка: останавливаем движение, но демо не выключаем —
-     * после отпускания датчика логика сможет продолжить работу. */
-    if (control->last_cmd_rpm != 0)
-    {
-      (void)Motor_Stop(control->motor);
-      control->last_cmd_rpm = 0;
-    }
-    return;
-  }
-
-  /* Переводим абсолютную позицию MKS в «ход от home» 0..max_travel. */
-  /* Переводим абсолютную позицию в ход от home. Например,
-   * home=258623, far=0, encoder_sign=-1:
+  /* Переводим абсолютную позицию MKS в «ход от home» 0..max_travel.
+   * Например, home=258623, far=0, encoder_sign=-1:
    *   position=258623 → travel=0;
    *   position=0      → travel=258623. */
   travel = (position - control->home_pos) * control->encoder_sign;
@@ -516,9 +545,97 @@ void Control_Loop(Control *control)
     travel = control->max_travel;
   }
 
+  /*
+   * Детектор удара.
+   *
+   * shock_min_force — минимум силы в текущем окне 250 мс.
+   * Если сила выросла на 800 г за это окно и достигла 800 г,
+   * считаем это ударом, а не плавным нажатием.
+   *
+   * Окно сбрасывается каждые 250 мс или при новом минимуме:
+   * медленный рост силы не должен считаться ударом.
+   */
+  if (!control->shock_active)
+  {
+    if (((HAL_GetTick() - control->shock_window_tick) >
+         CONTROL_SHOCK_WINDOW_MS) ||
+        (force < control->shock_min_force))
+    {
+      control->shock_min_force = force;
+      control->shock_window_tick = HAL_GetTick();
+    }
+
+    if ((force >= CONTROL_SHOCK_MIN_G) &&
+        ((force - control->shock_min_force) >= CONTROL_SHOCK_DELTA_G))
+    {
+      int32_t retract_target;
+
+      /* Уходим в far=0. Тормозить начинаем за SHOCK_BRAKE_COUNTS
+       * до 0: max_travel - 35000. */
+      retract_target = control->max_travel - CONTROL_SHOCK_BRAKE_COUNTS;
+      if (retract_target < 0)
+      {
+        retract_target = 0;
+      }
+
+      control->shock_active = 1U;
+      control->shock_holding = 0U;
+      control->shock_hold_tick = 0U;
+          control->shock_target_travel = retract_target;
+    }
+  }
+
+  if (control->shock_active)
+  {
+    /*
+     * Аварийный отвод в far=0 на максимальной скорости.
+     * Тормозить начинаем за SHOCK_BRAKE_COUNTS до 0.
+     * После остановки ждём SHOCK_HOLD_MS (1 с), затем
+     * возвращаемся к обычной логике. Это тестовый режим.
+     */
+    if (travel <
+        (control->shock_target_travel - CONTROL_SHOCK_STOP_TOLERANCE))
+    {
+      target_rpm = (int16_t)(control->motor_sign * control->max_rpm);
+      control->shock_holding = 0U;
+      control->shock_hold_tick = 0U;
+    }
+    else
+    {
+      target_rpm = 0;
+
+      if (!control->shock_holding)
+      {
+        control->shock_holding = 1U;
+        control->shock_hold_tick = HAL_GetTick();
+      }
+      else if ((HAL_GetTick() - control->shock_hold_tick) >=
+               CONTROL_SHOCK_HOLD_MS)
+      {
+        control->shock_active = 0U;
+        control->shock_holding = 0U;
+        control->shock_hold_tick = 0U;
+        control->shock_min_force = 1000000.0f;
+        control->shock_window_tick = HAL_GetTick();
+      }
+    }
+  }
+  /* Перегрузка в любую сторону. Демо не выключаем: когда сила
+   * вернётся в норму, логика продолжит работать. */
+  else if (force > control->max_force_g || force < -control->max_force_g)
+  {
+    /* Перегрузка: останавливаем движение, но демо не выключаем —
+     * после отпускания датчика логика сможет продолжить работу. */
+    if (control->last_cmd_rpm != 0)
+    {
+      (void)Motor_Stop(control->motor);
+      control->last_cmd_rpm = 0;
+    }
+    return;
+  }
   /* Если сила выше порога — едем от home. Скорость растёт с силой,
    * но ограничена снизу 1 RPM и сверху max_rpm. */
-  if (force >= (float)control->deadband_g)
+  else if (force >= (float)control->deadband_g)
   {
     if (travel < (control->max_travel - control->far_margin))
     {
@@ -579,8 +696,10 @@ void Control_Loop(Control *control)
   if (target_rpm != control->last_cmd_rpm)
   {
     /* acc=180: разгон/торможение примерно 0.34 с до 90 RPM.
+     * При аварийном отводе acc=0 — сразу максимальная скорость.
      * При ошибке сбрасываем last_cmd и повторим на следующем шаге. */
-    if (!Motor_Jog(control->motor, target_rpm, 180U))
+    if (!Motor_Jog(control->motor, target_rpm,
+                   control->shock_active ? 0U : 180U))
     {
       control->jog_failures++;
       control->last_cmd_rpm = 0;
@@ -635,7 +754,7 @@ void Control_PrintStatus(Control *control)
          (long)control->home_pos,
          (long)control->far_pos);
 
-  printf(" gain=%ld.%02ld maxrpm=%d dir=%d db=%d rel=%d maxf=%ld marg=%ld/%ld\r\n",
+  printf(" gain=%ld.%02ld maxrpm=%d dir=%d db=%d rel=%d maxf=%ld shock=%d marg=%ld/%ld\r\n",
          (long)(gain100 / 100),
          (long)(gain100 % 100),
          (int)control->max_rpm,
@@ -643,6 +762,7 @@ void Control_PrintStatus(Control *control)
          (int)control->deadband_g,
          (int)control->release_g,
          (long)(control->max_force_g + 0.5f),
+         (int)control->shock_active,
          (long)control->home_margin,
          (long)control->far_margin);
 }

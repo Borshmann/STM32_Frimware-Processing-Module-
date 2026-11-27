@@ -109,7 +109,13 @@ typedef enum
  * release_g              — порог возврата;
  * max_force_g            — аварийный порог перегрузки, граммы;
  * read_failures          — счётчик подряд идущих ошибок чтения;
- * jog_failures           — счётчик подряд идущих ошибок команды скорости.
+ * jog_failures           — счётчик подряд идущих ошибок команды скорости;
+ * shock_active           — 1, пока идёт аварийный отвод после удара;
+ * shock_holding          — 1, когда отвод завершён и идёт пауза;
+ * shock_target_travel    — до какого travel отводиться;
+ * shock_min_force        — минимум силы в окне детектора удара;
+ * shock_window_tick      — начало окна детектора удара;
+ * shock_hold_tick        — начало паузы после отвода.
  *
  * Счётчики нужны, чтобы краткие сбои сразу после homing не выключали демо.
  */
@@ -124,6 +130,12 @@ typedef struct
   uint8_t limits_valid;
   uint8_t read_failures;
   uint8_t jog_failures;
+  uint8_t shock_active;
+  uint8_t shock_holding;
+  int32_t shock_target_travel;
+  float shock_min_force;
+  uint32_t shock_window_tick;
+  uint32_t shock_hold_tick;
 
   int32_t home_pos;
   int32_t far_pos;

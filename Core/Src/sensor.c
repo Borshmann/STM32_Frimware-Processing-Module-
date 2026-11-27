@@ -13,7 +13,7 @@
  *   ADCO_B2 (0x12) — старший байт 24-битного результата.
  *
  * В текущей прошивке: внутренний LDO включён (AVDDS=1), VLDO=3.3 В,
- * PGA=128, 80 SPS при инициализации (потом можно переключить на 320 SPS).
+ * PGA=128, 320 SPS при инициализации.
  * Если плата питается от 3.3 В, LDO 3.3 В работает в dropout; при
  * необходимости можно попробовать 3.0 В (как в библиотеке Adafruit).
  *
@@ -22,7 +22,7 @@
  *   2. включение цифрового питания (PUD), ожидание PUR;
  *   3. включение аналогового питания и внутреннего LDO (PUA|AVDDS);
  *   4. CTRL1: LDO 3.3 В + PGA 128;
- *   5. CTRL2: 80 SPS;
+ *   5. CTRL2: 320 SPS;
  *   6. включение конденсатора PGA;
  *   7. внутренняя калибровка смещения (CALS);
  *   8. CS=1 — запуск непрерывных преобразований.
@@ -50,7 +50,7 @@
 #define NAU7802_CTRL2_CAL_ERR  0x08U
 
 #define NAU7802_CTRL1_3V3_128  0x27U
-#define NAU7802_CTRL2_80SPS    0x30U
+#define NAU7802_CTRL2_320SPS   0x70U
 #define NAU7802_PGA_CAP_EN     0x80U
 
 #define SENSOR_TARE_SAMPLES    32U
@@ -204,7 +204,7 @@ uint8_t Sensor_ReadRevision(Sensor *sensor, uint8_t *revision)
 }
 
 /* Полная инициализация NAU7802:
- *   сброс, включение питания, LDO, PGA=128, 80 SPS,
+ *   сброс, включение питания, LDO, PGA=128, 320 SPS,
  *   внутренняя калибровка смещения, запуск непрерывных преобразований.
  * Возвращает 1 при успехе. */
 uint8_t Sensor_Begin(Sensor *sensor)
@@ -269,13 +269,13 @@ uint8_t Sensor_Begin(Sensor *sensor)
   /* Шаг 4. CTRL1 = 0x27:
    *   биты VLDO[5:3] = 100 → 3.3 В;
    *   биты GAIN[2:0] = 111 → PGA 128.
-   * Шаг 5. CTRL2 = 0x30 → 80 SPS.
+   * Шаг 5. CTRL2 = 0x70 → 320 SPS.
    * Шаг 6. Включаем конденсатор PGA (PGA_PWR, бит 7). */
   if (!sensor_reg_write(sensor, NAU7802_REG_CTRL1, NAU7802_CTRL1_3V3_128))
   {
     return 0U;
   }
-  if (!sensor_reg_write(sensor, NAU7802_REG_CTRL2, NAU7802_CTRL2_80SPS))
+  if (!sensor_reg_write(sensor, NAU7802_REG_CTRL2, NAU7802_CTRL2_320SPS))
   {
     return 0U;
   }

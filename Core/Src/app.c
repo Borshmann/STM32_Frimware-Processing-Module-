@@ -30,7 +30,7 @@
 #define AUTO_FAR_MARGIN       55000L
 #define AUTO_GAIN_RPM_PER_G   0.16f
 #define AUTO_MAX_RPM          90
-#define AUTO_RETURN_RPM       20
+#define AUTO_RETURN_RPM       40
 #define AUTO_DEADBAND_G       30
 #define AUTO_RELEASE_G        15
 #define AUTO_MAX_FORCE_G      2000.0f
@@ -951,48 +951,36 @@ static void app_auto_demo(void)
 static void app_print_help(void)
 {
   printf("Commands:\r\n");
-  printf("  HELP / ?          this help\r\n");
-  printf("  STATUS            state, clock, sensors, MKS\r\n");
-  printf("  SCAN / I2C        scan both I2C buses\r\n");
-  printf("  INIT              initialize/reinitialize both sensors\r\n");
-  printf("  AUTO / SETUP      full demo setup: init, tare, home, limits, DEMO\r\n");
-  printf("  RATE [10|20|40|80|320]  set/query NAU7802 rate\r\n");
-  printf("  R / R1 / R2       single read, raw + grams\r\n");
-  printf("  B1 [n] / B2 [n]   batch of n samples (default 10, max 50)\r\n");
-  printf("  STREAM 1|2 [ms]   grams only, median3, default 200 ms\r\n");
-  printf("  STREAM 0          stop streaming\r\n");
-  printf("  FAST 1|2          320 SPS, only grams, no prefix\r\n");
-  printf("  FAST 0            stop fast stream\r\n");
-  printf("  T / T1 / T2       tare sensor(s), no load\r\n");
-  printf("  CAL1 <g>          calibrate sensor 1 with known weight\r\n");
-  printf("  CAL2 <g>          calibrate sensor 2 with known weight\r\n");
-  printf("  COEF <counts/g>   set sensor 1 coefficient manually\r\n");
-  printf("  PING              ping MKS on its address\r\n");
-  printf("  POS               read MKS encoder position\r\n");
-  printf("  HOME              run MKS GoHome (hall sensor)\r\n");
-  printf("  MODE              set MKS SR_vFOC (persistent)\r\n");
-  printf("  UNLOCK            broadcast key-unlock\r\n");
-  printf("  RECOVER           broadcast unlock/mode/addr/rsp/baud\r\n");
-  printf("  EN 1|0            enable/disable MKS\r\n");
-  printf("  JOG <rpm> [ms]    +/-30 RPM, default 2000 ms\r\n");
-  printf("  STOP              stop motor\r\n");
-  printf("  LIMIT HOME|FAR [n] record limit at current position or set n\r\n");
-  printf("  MARGIN <home> <far> soft-limit margins in encoder counts\r\n");
-  printf("  DIR 1|-1          motor sign for away-from-home direction\r\n");
-  printf("  GAIN <rpm/g>      demo force-to-speed gain\r\n");
-  printf("  MAXRPM <rpm>      demo speed limit\r\n");
-  printf("  RETURN <rpm>      demo return-to-home speed\r\n");
-  printf("  DEADBAND <g>      force threshold to start moving\r\n");
-  printf("  RELEASE <g>       force threshold to return home\r\n");
-  printf("  MAXFORCE <g>      overload limit, default 2000 g\r\n");
-  printf("  DEMO 1|0          start/stop force-follow demo\r\n");
-  printf("  CTRL              demo status\r\n");
-  printf("  VERSION           read MKS version\r\n");
-  printf("  CLOCK             print clock frequencies\r\n");
+  printf("  HELP              this help\r\n");
+  printf("  STATUS            state, sensors, MKS\r\n");
+  printf("  AUTO              full setup: init, tare, home, limits, DEMO\r\n");
   printf("\r\n");
-  printf("Sequence: INIT -> T1 -> put known weight -> CAL1 500 -> R1\r\n");
+  printf("  T1                tare sensor 1, no load\r\n");
+  printf("  CAL1 <g>          calibrate sensor 1 with known weight\r\n");
+  printf("  COEF <counts/g>   set sensor 1 coefficient manually\r\n");
+  printf("  R1 / B1 [n]       one reading / batch of raw samples\r\n");
+  printf("  FAST 1|0          320 SPS stream, grams only\r\n");
+  printf("\r\n");
+  printf("  PING / POS / HOME MKS status / position / homing\r\n");
+  printf("  EN 1|0            enable/disable motor\r\n");
+  printf("  JOG <rpm> [ms]    manual run, max +/-30 RPM\r\n");
+  printf("  STOP              stop motor\r\n");
+  printf("  RECOVER           broadcast MKS recovery\r\n");
+  printf("\r\n");
+  printf("  LIMIT HOME|FAR [n]  set limit by position or number\r\n");
+  printf("  MARGIN <home> <far>  soft-limit margins, counts\r\n");
+  printf("  DIR 1|-1            motor sign away from home\r\n");
+  printf("  GAIN <rpm/g>        force-to-speed gain\r\n");
+  printf("  MAXRPM <rpm>        speed limit\r\n");
+  printf("  RETURN <rpm>        return-to-home speed\r\n");
+  printf("  DEADBAND <g>        start threshold\r\n");
+  printf("  RELEASE <g>         return threshold\r\n");
+  printf("  MAXFORCE <g>        overload limit, default 2000 g\r\n");
+  printf("  DEMO 1|0            start/stop demo\r\n");
+  printf("  CTRL                demo status\r\n");
+  printf("\r\n");
   printf("JOG positive = CCW, negative = CW.\r\n");
-  printf("Before JOG: send MODE, then EN 1.\r\n");
+  printf("Before JOG: send EN 1.\r\n");
 }
 
 /* Стартовый баннер: версия, подсказка HELP и состояние датчиков. */
