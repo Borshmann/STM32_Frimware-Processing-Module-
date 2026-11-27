@@ -8,7 +8,7 @@
  *   - разобрать команду и вызвать нужный модуль (sensor/motor/control);
  *   - вести потоки STREAM/FAST и автостоп JOG по таймеру;
  *   - выполнить AUTO — полный запуск демо одной командой;
- *   - мигать светодиодом и обслуживать главный цикл App_Loop().
+ *   - управлять LED (горит при активном DEMO) и обслуживать App_Loop().
  *
  * Внешний CLI: 115200 8N1, команды регистронезависимые, конец строки — Enter.
  * Внутренний протокол MKS и модуль control описаны в motor.c и control.c.
@@ -60,7 +60,8 @@ static volatile uint8_t app_line_ready = 0U;
 /* Состояние ручного JOG: активен ли и когда его останавливать. */
 static uint8_t app_jog_active = 0U;
 static uint32_t app_jog_end_tick = 0U;
-static uint32_t app_led_tick = 0U;
+/* Текущее состояние LED: 1 — горит (цикл DEMO активен), 0 — погашен. */
+static uint8_t app_led_on = 0U;
 
 /*
  * ВРЕМЕННО: калибровка для текущего датчика и монтажа.
@@ -1676,7 +1677,8 @@ void App_Init(I2C_HandleTypeDef *i2c1,
   app_line_len = 0U;
   app_line_ready = 0U;
   app_jog_active = 0U;
-  app_led_tick = HAL_GetTick();
+  app_led_on = 0U;
+  HAL_GPIO_WritePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin, GPIO_PIN_SET);
   app_stream_sensor = NULL;
   app_stream_period_ms = 0U;
   app_fast_sensor = NULL;
@@ -1696,7 +1698,7 @@ void App_Init(I2C_HandleTypeDef *i2c1,
 }
 
 /* Главный цикл приложения:
- *   JOG-автостоп, шаг демо, потоки STREAM/FAST, CLI и мигание LED. */
+ *   JOG-автостоп, шаг демо, потоки STREAM/FAST, CLI и LED (DEMO). */
 void App_Loop(void)
 {
   /* 1. Проверяем, не истекло ли время ручного JOG. */
@@ -1716,11 +1718,12 @@ void App_Loop(void)
   /* 4. Разбираем накопленную строку CLI. */
   app_cli_poll();
 
-  /* 5. Мигаем светодиодом примерно 1 Гц. */
-  if ((HAL_GetTick() - app_led_tick) >= 500U)
+  /* 5. LED горит только при активном цикле DEMO. */
+  if (app_led_on != (control1.active ? 1U : 0U))
   {
-    app_led_tick = HAL_GetTick();
-    HAL_GPIO_TogglePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin);
+    app_led_on = control1.active ? 1U : 0U;
+    HAL_GPIO_WritePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin,
+                      app_led_on ? GPIO_PIN_RESET : GPIO_PIN_SET);
   }
 }
 

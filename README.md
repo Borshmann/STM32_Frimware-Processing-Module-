@@ -127,7 +127,7 @@ AUTO
   -w "C:\Users\lvov\Documents\STM32_PROJECTS\Plata\Debug\Plata.elf" -v -rst
 ```
 
-Последняя сборка: `text=57144`, `data=468`, `bss=2500`, 0 ошибок, 0 предупреждений.
+Последняя сборка: `text=57136`, `data=468`, `bss=2500`, 0 ошибок, 0 предупреждений.
 
 ## Как смотреть вывод
 
@@ -242,7 +242,7 @@ STOP
 | I2C1 / I2C2 | 100 кГц |
 | Прерывания | USART1, USART2 |
 | PB0 / PB1 | DE внешнего / моторного RS485 |
-| PC13 | светодиод, мигает 2 Гц |
+| PC13 | светодиод: горит при активном DEMO |
 
 ## Карта пинов
 
@@ -263,7 +263,7 @@ STOP
 | PB11 | I2C2_SDA | NAU7802 №2, SDA |
 | PD0/PD1 | HSE | Кварц 8 МГц |
 | PA13/PA14 | SWD | ST-Link |
-| PC13 | GPIO_Output | Светодиод платы |
+| PC13 | GPIO_Output | Светодиод: горит при DEMO |
 | NRST | Reset | ST-Link / кнопка |
 | BOOT0 | Boot | 10 кОм на GND |
 
