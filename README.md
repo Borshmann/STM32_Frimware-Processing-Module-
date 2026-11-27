@@ -242,6 +242,9 @@ STOP
 
 ## Карта пинов
 
+<img width="693" height="680" alt="image" src="https://github.com/user-attachments/assets/03ead0c9-edc4-4db9-9aab-779c4851fbef" />
+
+
 | Пин | CubeMX | Назначение |
 |---|---|---|
 | PA9 | USART1_TX | SP3485 №1, DI |
