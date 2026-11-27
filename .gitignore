@@ -1,0 +1,25 @@
+# Сборка STM32CubeIDE
+Debug/
+Release/
+.settings/
+*.launch
+
+# Артефакты сборки
+*.o
+*.d
+*.elf
+*.map
+*.list
+*.hex
+*.bin
+*.su
+
+# Логи и временные файлы
+*.log
+*.bak
+*.orig
+*.rej
+
+# Системные файлы
+Thumbs.db
+.DS_Store
