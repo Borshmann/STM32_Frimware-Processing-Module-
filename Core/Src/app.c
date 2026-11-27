@@ -30,7 +30,7 @@
 #define AUTO_FAR_MARGIN       55000L
 #define AUTO_GAIN_RPM_PER_G   0.16f
 #define AUTO_MAX_RPM          90
-#define AUTO_RETURN_RPM       40
+#define AUTO_RETURN_RPM       20
 #define AUTO_DEADBAND_G       30
 #define AUTO_RELEASE_G        15
 #define AUTO_MAX_FORCE_G      2000.0f

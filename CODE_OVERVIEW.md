@@ -316,7 +316,7 @@ home=258623  far=0
 margin home=15000  far=55000
 gain=0.16 RPM/г
 maxrpm=90
-return=40 RPM
+return=20 RPM
 deadband=30 г
 release=15 г
 overload=2000 г (MAXFORCE)
@@ -368,7 +368,7 @@ shock: +2000 г (больше 2 кг) за 250 мс → отвод в 0 на MAX
 6. MKS получает F6, разгоняется и едет к far.
 7. На каждом шаге читается позиция; когда `travel` доходит до
    `max_travel - far_margin`, движение запрещается, отправляется стоп.
-8. Ты снимаешь гирю. Сила < release 15 → `target = -40 RPM`.
+8. Ты снимаешь гирю. Сила < release 15 → `target = -20 RPM`.
 9. MKS едет обратно к home; когда `travel <= home_margin`, стоп.
 10. Демо остаётся включённым и ждёт следующего нажатия.
 
