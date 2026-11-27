@@ -33,6 +33,7 @@
 #define AUTO_RETURN_RPM       20
 #define AUTO_DEADBAND_G       30
 #define AUTO_RELEASE_G        15
+#define AUTO_MAX_FORCE_G      2000.0f
 #define AUTO_COUNTS_PER_G     1116.0f
 #define AUTO_HOMING_TIMEOUT_MS 30000U
 
@@ -930,6 +931,7 @@ static void app_auto_demo(void)
   Control_SetReturnRpm(&control1, AUTO_RETURN_RPM);
   Control_SetDeadband(&control1, AUTO_DEADBAND_G);
   Control_SetRelease(&control1, AUTO_RELEASE_G);
+  Control_SetMaxForce(&control1, AUTO_MAX_FORCE_G);
 
   /* Даём MKS время выйти из режима homing. */
   HAL_Delay(1000U);
@@ -982,6 +984,7 @@ static void app_print_help(void)
   printf("  RETURN <rpm>      demo return-to-home speed\r\n");
   printf("  DEADBAND <g>      force threshold to start moving\r\n");
   printf("  RELEASE <g>       force threshold to return home\r\n");
+  printf("  MAXFORCE <g>      overload limit, default 2000 g\r\n");
   printf("  DEMO 1|0          start/stop force-follow demo\r\n");
   printf("  CTRL              demo status\r\n");
   printf("  VERSION           read MKS version\r\n");
@@ -1455,6 +1458,22 @@ static void app_execute(char *line)
       printf("DEMO: release=%d g, deadband=%d g\r\n",
              (int)control1.release_g,
              (int)control1.deadband_g);
+    }
+  }
+  /* MAXFORCE <г> — аварийный порог перегрузки, по умолчанию 2000 г. */
+  else if (strcmp(cmd, "maxforce") == 0 || strcmp(cmd, "overload") == 0)
+  {
+    int grams = (arg1 != NULL) ? atoi(arg1) : 0;
+
+    if (grams <= 0)
+    {
+      printf("Usage: MAXFORCE <grams> (100..2000)\r\n");
+    }
+    else
+    {
+      Control_SetMaxForce(&control1, (float)grams);
+      printf("DEMO: max force=%ld g\r\n",
+             (long)(control1.max_force_g + 0.5f));
     }
   }
   /* DEMO 1|0 — включить/выключить демо. */

@@ -118,7 +118,7 @@ arg2 = strtok(NULL, " \t");   // третий
 - `R`, `R1`, `R2`, `B1`, `B2`, `STREAM`, `FAST`;
 - `T1`, `T2`, `CAL1`, `CAL2`, `COEF`;
 - `PING`, `POS`, `HOME`, `LIMIT`, `MARGIN`;
-- `DIR`, `GAIN`, `MAXRPM`, `RETURN`, `DEADBAND`, `RELEASE`;
+- `DIR`, `GAIN`, `MAXRPM`, `RETURN`, `DEADBAND`, `RELEASE`, `MAXFORCE`;
 - `DEMO`, `CTRL`;
 - `MODE`, `UNLOCK`, `RECOVER`, `EN`, `JOG`, `STOP`;
 - `VERSION`, `CLOCK`.
@@ -273,7 +273,8 @@ travel = (position - home_pos) * encoder_sign
 
 1. **Читает силу** — медиана 5 сырых отсчётов.
 2. **Читает позицию** MKS.
-3. **Перегрузка** `|force| > 900 г` → стоп, но демо не выключается.
+3. **Перегрузка** `|force| > max_force_g` (по умолчанию 2000 г)
+   → стоп, но демо не выключается.
 4. **Считает travel** и ограничивает его `0..max_travel`.
 5. **Выбирает режим:**
 
@@ -316,7 +317,7 @@ maxrpm=90
 return=20 RPM
 deadband=30 г
 release=15 г
-overload=900 г
+overload=2000 г (MAXFORCE)
 ```
 
 Рабочий ход между запасами:

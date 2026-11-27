@@ -10,8 +10,8 @@
  *   - при силе выше DEADBAND скорость пропорциональна силе;
  *   - при отпускании (сила ниже RELEASE) каретка возвращается к home;
  *   - крайние точки ограничены программно (home_margin/far_margin);
- *   - при перегрузке выше CONTROL_MAX_FORCE_G движение стопорится,
- *     но демо остаётся включённым.
+ *   - при перегрузке выше max_force_g (по умолчанию 2000 г)
+ *     движение стопорится, но демо остаётся включённым.
  *
  * Это не финальный PI-регулятор, а отладочная логика для проверки
  * механики, направлений, пределов и связи с MKS.
@@ -40,7 +40,7 @@
  *   3. Если сила < release — возвращаемся к home.
  *   4. Между release и deadband — стоим (гистерезис).
  *   5. У краёв не доезжаем home_margin/far_margin counts.
- *   6. При перегрузке > CONTROL_MAX_FORCE_G просто стоп.
+ *   6. При перегрузке > max_force_g просто стоп.
  */
 /*
  * Период работы контура. 50 мс — компромисс между скоростью реакции
@@ -53,8 +53,9 @@
 #define CONTROL_DEFAULT_HOME_MARGIN 300
 #define CONTROL_DEFAULT_FAR_MARGIN  1500
 
-/* Аварийный порог силы: выше него движение останавливается. */
-#define CONTROL_MAX_FORCE_G        900.0f
+/* Аварийный порог силы по умолчанию: 2000 г (датчик YZC-133 на 2 кг).
+ * Меняется командой MAXFORCE. */
+#define CONTROL_DEFAULT_MAX_FORCE_G 2000.0f
 
 /* Количество отсчётов для медианного фильтра силы. */
 #define CONTROL_FILTER_N           5U
@@ -181,6 +182,7 @@ void Control_Init(Control *control, Sensor *sensor, Motor *motor)
   control->return_rpm = 1;
   control->deadband_g = 30;
   control->release_g = 15;
+  control->max_force_g = CONTROL_DEFAULT_MAX_FORCE_G;
   control->last_cmd_rpm = 0;
   control->last_position = 0;
   control->last_force_g = 0.0f;
@@ -369,6 +371,28 @@ void Control_SetRelease(Control *control, int16_t grams)
   control->release_g = grams;
 }
 
+/* Задаёт аварийный порог перегрузки в граммах.
+ * Нижняя граница 100 г — рабочий диапазон начинается с 100 г.
+ * Верхняя 2000 г — предел тензодатчика YZC-133 (2 кг). */
+void Control_SetMaxForce(Control *control, float grams)
+{
+  if (control == NULL)
+  {
+    return;
+  }
+
+  if (grams < 100.0f)
+  {
+    grams = 100.0f;
+  }
+  if (grams > 2000.0f)
+  {
+    grams = 2000.0f;
+  }
+
+  control->max_force_g = grams;
+}
+
 /* Проверяет готовность датчика, мотора и пределов и включает демо. */
 uint8_t Control_Start(Control *control)
 {
@@ -462,7 +486,7 @@ void Control_Loop(Control *control)
 
   /* Перегрузка в любую сторону. Демо не выключаем: когда сила
    * вернётся в норму, логика продолжит работать. */
-  if (force > CONTROL_MAX_FORCE_G || force < -CONTROL_MAX_FORCE_G)
+  if (force > control->max_force_g || force < -control->max_force_g)
   {
     /* Перегрузка: останавливаем движение, но демо не выключаем —
      * после отпускания датчика логика сможет продолжить работу. */
@@ -611,13 +635,14 @@ void Control_PrintStatus(Control *control)
          (long)control->home_pos,
          (long)control->far_pos);
 
-  printf(" gain=%ld.%02ld maxrpm=%d dir=%d db=%d rel=%d marg=%ld/%ld\r\n",
+  printf(" gain=%ld.%02ld maxrpm=%d dir=%d db=%d rel=%d maxf=%ld marg=%ld/%ld\r\n",
          (long)(gain100 / 100),
          (long)(gain100 % 100),
          (int)control->max_rpm,
          (int)control->motor_sign,
          (int)control->deadband_g,
          (int)control->release_g,
+         (long)(control->max_force_g + 0.5f),
          (long)control->home_margin,
          (long)control->far_margin);
 }

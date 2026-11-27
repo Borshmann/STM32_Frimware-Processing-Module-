@@ -107,6 +107,7 @@ typedef enum
  * return_rpm             — скорость возврата к home;
  * deadband_g             — порог начала движения;
  * release_g              — порог возврата;
+ * max_force_g            — аварийный порог перегрузки, граммы;
  * read_failures          — счётчик подряд идущих ошибок чтения;
  * jog_failures           — счётчик подряд идущих ошибок команды скорости.
  *
@@ -137,6 +138,7 @@ typedef struct
   int16_t return_rpm;
   int16_t deadband_g;
   int16_t release_g;
+  float max_force_g;
 
   int16_t last_cmd_rpm;
   int32_t last_position;
@@ -210,6 +212,7 @@ void Control_SetMaxRpm(Control *control, int16_t rpm);
 void Control_SetReturnRpm(Control *control, int16_t rpm);
 void Control_SetDeadband(Control *control, int16_t grams);
 void Control_SetRelease(Control *control, int16_t grams);
+void Control_SetMaxForce(Control *control, float grams);
 void Control_PrintStatus(Control *control);
 
 /* app.c: инициализация приложения, CLI и главный цикл. */
